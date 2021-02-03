@@ -200,7 +200,7 @@ class Trainer(object):
         self.writer.add_scalar(tag='validation f1', scalar_value=running_val_f1, global_step=epoch)
 
         # Adjust learning rate
-        self.scheduler.step(self.patience)
+        self.scheduler.step()
 
     def test_loop(self):
         """Evalution of the test set."""
