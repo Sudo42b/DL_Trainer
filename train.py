@@ -11,7 +11,7 @@ from torch.nn.modules.loss import BCEWithLogitsLoss
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 #Learning Rate Scheduler
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim import lr_scheduler
 #Tensorboard
 from torch.utils.tensorboard import SummaryWriter
 
@@ -26,7 +26,7 @@ from datetime import datetime
 from sklearn.metrics import precision_score, recall_score
 #Custom Package
 from utils.config import Hyperparameter
-from utils.dataloader import SleepData
+from utils.air_dataloader import AirDataSet as DataLoader
 
 from utils.utils import plot_loss_graph, \
                         get_performance, \
@@ -37,7 +37,8 @@ from utils.utils import plot_loss_graph, \
                         get_network
 #Custom Trainer
 from utils.trainer import Trainer
-
+from utils.lr_scheduler import CosineAnnealingWarmupRestarts
+from torchvision import models
 
 time = datetime.now()
 time = time.strftime("%y%m%d%H%M")
@@ -50,9 +51,10 @@ lr = Hyperparameter.LEARNING_RATE
 num_epochs = Hyperparameter.NUM_EPOCHS
 
 
-dataset = SleepData('./dataset/train', 
+dataset = DataLoader('./dataset/', 
                   batch_size= batch_size,
-                  n_classes= num_classes)
+                  n_classes= num_classes,
+                  transforms=Hyperparameter.TRAIN_TRANSFORMS)
 
 torch.manual_seed(Hyperparameter.RANDOM_SEED)
 if torch.cuda.is_available():
@@ -62,10 +64,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-net', type=str, required=True, help='net type')
 parser.add_argument('-gpu', type=bool, default=True, help='use gpu or not')
 parser.add_argument('-nc', type=int, default=5, help='number of class')
+parser.add_argument('-sz', type=int, default=3, help='input channel size')
 parser.add_argument('-cs', type=int, default=3, help='input channel size')
 args = parser.parse_args()
-net = get_network(args, use_gpu=args.gpu)
-
+#net = get_network(args, use_gpu=args.gpu)
+net = models.resnet50(pretrained=True)
+num_ftrs = net.fc.in_features
+# Here the size of each output sample is set to 2.
+# Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
+net.fc = nn.Linear(num_ftrs, 2)
+net.to(Hyperparameter.device)
 #### DATA PARALLEL START ####
 if torch.cuda.device_count() > 1:
     print("Using", torch.cuda.device_count(), "GPUs")
@@ -102,18 +110,26 @@ else:
     loss_fn = nn.BCEWithLogitsLoss()
 
 optimizer = optim.Adam(net.parameters(),lr = lr)
-scheduler = ReduceLROnPlateau(optimizer, 
-                            mode= 'min', 
-                            factor= 0.1, 
-                            patience= Hyperparameter.PATIENCE)
+scheduler = scheduler = CosineAnnealingWarmupRestarts(optimizer,
+                                          first_cycle_steps= Hyperparameter.NUM_EPOCHS//2,
+                                          cycle_mult=0.5,
+                                          max_lr= Hyperparameter.LEARNING_RATE,
+                                          min_lr=0.0,
+                                          warmup_steps=1,
+                                          gamma=0.5)
 
-
-train_set= SleepData('./dataset/train', batch_size= Hyperparameter.BATCH_SIZE, 
-                    n_classes=Hyperparameter.NUM_CLASSES)
-val_set= SleepData('./dataset/validation/', batch_size= Hyperparameter.BATCH_SIZE,
-                    n_classes=Hyperparameter.NUM_CLASSES)
-test_set= SleepData('./dataset/test', batch_size= Hyperparameter.BATCH_SIZE,
-                    n_classes=Hyperparameter.NUM_CLASSES) 
+train_set= DataLoader('./dataset', batch_size= Hyperparameter.BATCH_SIZE,
+                        use='train', 
+                        n_classes=Hyperparameter.NUM_CLASSES,
+                        transforms=Hyperparameter.TRAIN_TRANSFORMS)
+val_set= DataLoader('./dataset', batch_size= Hyperparameter.BATCH_SIZE,
+                    use='valid',
+                    n_classes=Hyperparameter.NUM_CLASSES,
+                    transforms=Hyperparameter.VALID_TRANSFORMS)
+test_set= DataLoader('./dataset', batch_size= Hyperparameter.BATCH_SIZE,
+                     use='valid',
+                    n_classes=Hyperparameter.NUM_CLASSES,
+                    transforms=Hyperparameter.VALID_TRANSFORMS) 
 # Train
 trainer = Trainer(train_set= train_set, val_set= val_set, test_set= test_set, 
                     model= net, 

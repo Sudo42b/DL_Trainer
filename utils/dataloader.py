@@ -21,12 +21,11 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
 
 class SleepData(Dataset):
-    """AirQuality dataset."""
+    """Sleep dataset."""
     def __init__(self, 
                 root, 
                 batch_size, 
-                n_classes = 6,
-                split_length=720):
+                n_classes = 6):
         self.n_classes = n_classes
         self.batch_size = batch_size
         try:
@@ -41,7 +40,7 @@ class SleepData(Dataset):
         if len(self.json_files) < 1:
             print('No json files were found in the path')
             return None
-        self.split_length = split_length
+        
         self.X = []
         self.y = []
         
@@ -138,5 +137,5 @@ if __name__ == "__main__":
     a = SleepData(root='../dataset', batch_size=1)
     
     y_train = a.y
-
+    
     #print(class_weights)

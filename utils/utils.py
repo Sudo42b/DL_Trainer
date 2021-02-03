@@ -149,10 +149,10 @@ def plot_loss_graph(train_loss, train_acc, train_pre, train_rec, train_f1,
     plt.plot(val_f1, label="val_f1")
     plt.legend(loc='lower right')
 
-    # Show plots
-    plt.show()
     if save_path:
         plt.savefig(save_path)
+    # Show plots
+    plt.show()
     
 def plot_confusion_matrix(y_true, y_pred, classes, cmap=plt.cm.Blues):
     """Plot a confusion matrix using ground truth and predictions."""

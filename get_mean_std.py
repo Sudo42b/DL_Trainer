@@ -22,10 +22,7 @@ import numpy as np
 import models
 import utils
 import time
-from dataset import VIBETest
-from dataset import VIBETrain
-from dataset import VIBEF_Test
-from dataset import VIBEF_Train
+from utils.air_dataloader import AirDataSet
 from torchvision import transforms, datasets
 
 # from models import *
@@ -60,14 +57,10 @@ if __name__ == '__main__':
     # Data
     print('==> Preparing data..')
     transform_train = transforms.Compose([
-        transforms.ToPILImage(),
         transforms.ToTensor()
     ])
     
-    # train_dataset = VIBETrain(os.path.join('./data/vibe'), 
-    #                           data_type='mfcc',
-    #                           transform=transform_train)
-    train_dataset = VIBETest(os.path.join('./data/vibe'), data_type='mfcc', transform=transform_train)
+    train_dataset = AirDataSet(os.path.join('dataset'),batch_size=1, transforms=transform_train, use='valid')
     
     training_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, num_workers=1, batch_size=1)
     print('%d training samples.' % len(train_dataset))

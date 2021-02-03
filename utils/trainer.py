@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 from tqdm.auto import tqdm
-
+from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
 class Trainer(object):
 
     def __init__(self, **kwargs):
@@ -47,13 +47,11 @@ class Trainer(object):
                             f" {self.train_rec[-1]:.3f}| "
                             f" {self.train_f1[-1]:.3f}, "
                     f"v_a|p|r|f: {self.val_acc[-1]:.3f}| "
-                                            f" {self.val_pre[-1]:.3f}| "
-                                            f" {self.val_rec[-1]:.3f}| "
-                                            f" {self.val_f1[-1]:.3f}")
-            
+                            f" {self.val_pre[-1]:.3f}| "
+                            f" {self.val_rec[-1]:.3f}| "
+                            f" {self.val_f1[-1]:.3f}")
+
             tbar.set_description(f"{msg}, Epo: {epoch} | t_loss: {self.train_loss[-1]:.3f}, v_loss: {self.val_loss[-1]:.3f}")
-            
-            
             
             # Early stopping
             if self.val_loss[-1] < best_val_loss:
@@ -104,17 +102,26 @@ class Trainer(object):
                 predictions = y_pred.max(dim=1)[1] # class
             else:
                 y_pred = torch.sigmoid(y_pred)
-                predictions = (y_pred>0.5).float()
+                predictions = (y_pred>0.5).float().detach().cpu()
                 
             # Metrics
-            accuracy, precision, recall, f1 = self.accuracy_fn(y_pred=predictions, y_true=y)
+            #accuracy, precision, recall, f1 = self.accuracy_fn(y_pred=predictions, y_true=y)
+            accuracy = accuracy_score(y_pred = predictions.detach().cpu().numpy(), 
+                                        y_true=y.detach().cpu())
+            precision = precision_score(y_pred = predictions.detach().cpu().numpy(), 
+                                        y_true=y.detach().cpu())
+            recall = recall_score(y_pred = predictions.detach().cpu().numpy(), 
+                                    y_true=y.detach().cpu())
+            f1 = f1_score(y_pred = predictions.detach().cpu().numpy(), 
+                            y_true=y.detach().cpu())
+            
             
             # Update batch metrics
-            running_train_loss += (loss - running_train_loss) / (i + 1)
-            running_train_acc += (accuracy - running_train_acc) / (i + 1)
-            running_train_pre += (precision - running_train_pre) / (i + 1)
-            running_train_rec += (recall - running_train_rec) / (i + 1)
-            running_train_f1 += (f1 - running_train_f1) / (i + 1)
+            running_train_loss = (loss + i*running_train_loss) / (i + 1)
+            running_train_acc = (accuracy + i*running_train_acc) / (i + 1)
+            running_train_pre = (precision + i*running_train_pre) / (i + 1)
+            running_train_rec = (recall + i*running_train_rec) / (i + 1)
+            running_train_f1 = (f1 + i*running_train_f1) / (i + 1)
         
         # Update epoch metrics
         self.train_loss.append(running_train_loss)
@@ -161,14 +168,22 @@ class Trainer(object):
                 y_pred = torch.sigmoid(y_pred)
                 predictions = (y_pred>0.5).float()
             # Metrics
-            accuracy, precision, recall, f1 = self.accuracy_fn(y_pred=predictions, y_true=y)
+            #accuracy, precision, recall, f1 = self.accuracy_fn(y_pred=predictions, y_true=y)
+            accuracy = accuracy_score(y_pred = predictions.detach().cpu().numpy(), 
+                                        y_true=y.detach().cpu().numpy())
+            precision = precision_score(y_pred = predictions.detach().cpu().numpy(),
+                                        y_true=y.detach().cpu().numpy())
+            recall = recall_score(y_pred = predictions.detach().cpu().numpy(),
+                                    y_true=y.detach().cpu().numpy())
+            f1 = f1_score(y_pred = predictions.detach().cpu().numpy(),
+                            y_true=y.detach().cpu().numpy())
             
             # Update batch metrics
-            running_val_loss += (loss - running_val_loss) / (i + 1)
-            running_val_acc += (accuracy - running_val_acc) / (i + 1)
-            running_val_pre += (precision - running_val_pre) / (i + 1)
-            running_val_rec += (recall - running_val_rec) / (i + 1)
-            running_val_f1 += (f1 - running_val_f1) / (i + 1)
+            running_val_loss = (loss + i*running_val_loss) / (i + 1)
+            running_val_acc = (accuracy + i*running_val_acc) / (i + 1)
+            running_val_pre = (precision + i*running_val_pre) / (i + 1)
+            running_val_rec = (recall + i*running_val_rec) / (i + 1)
+            running_val_f1 = (f1 + i*running_val_f1) / (i + 1)
 
         # Update epoch metrics
         self.val_loss.append(running_val_loss)
@@ -185,7 +200,7 @@ class Trainer(object):
         self.writer.add_scalar(tag='validation f1', scalar_value=running_val_f1, global_step=epoch)
 
         # Adjust learning rate
-        self.scheduler.step(running_val_loss)
+        self.scheduler.step(self.patience)
 
     def test_loop(self):
         """Evalution of the test set."""
@@ -213,14 +228,22 @@ class Trainer(object):
 
             # Metrics
             predictions = y_pred.max(dim=1)[1] # class
-            accuracy, precision, recall, f1 = self.accuracy_fn(y_pred=predictions, y_true=y)
+            #accuracy, precision, recall, f1 = self.accuracy_fn(y_pred=predictions, y_true=y)
+            accuracy = accuracy_score(y_pred = predictions.detach().cpu().numpy(), 
+                                        y_true=y.detach().cpu().numpy())
+            precision = precision_score(y_pred = predictions.detach().cpu().numpy(), 
+                                        y_true=y.detach().cpu().numpy())
+            recall = recall_score(y_pred = predictions.detach().cpu().numpy(), 
+                                        y_true=y.detach().cpu().numpy())
+            f1 = f1_score(y_pred = predictions.detach().cpu().numpy(), 
+                                        y_true=y.detach().cpu().numpy())
 
             # Update batch metrics
-            running_test_loss += (loss - running_test_loss) / (i + 1)
-            running_test_acc += (accuracy - running_test_acc) / (i + 1)
-            running_test_pre += (precision - running_test_acc) / (i + 1)
-            running_test_rec += (recall - running_test_acc) / (i + 1)
-            running_test_f1 += (f1 - running_test_acc) / (i + 1)
+            running_test_loss = (loss + i*running_test_loss) / (i + 1)
+            running_test_acc = (accuracy + i*running_test_acc) / (i + 1)
+            running_test_pre = (precision + i*running_test_pre) / (i + 1)
+            running_test_rec = (recall + i*running_test_rec) / (i + 1)
+            running_test_f1 = (f1 + i*running_test_f1) / (i + 1)
 
             # Store values
             y_preds.extend(predictions.cpu().numpy())
